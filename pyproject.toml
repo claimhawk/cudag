@@ -7,17 +7,18 @@ name = "cudag"
 version = "0.1.0"
 description = "CUDAG - ComputerUseDataAugmentedGeneration framework for building VLM training data generators"
 readme = "README.md"
-license = {text = "Proprietary"}
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [
-    {name = "Tylt LLC", email = "dev@tylt.ai"},
+    {name = "ClaimHawk Michael"},
 ]
 keywords = ["vlm", "training-data", "computer-use", "vision-language-model", "dataset-generation"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -42,10 +43,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tylt/cudag"
-Documentation = "https://github.com/tylt/cudag#readme"
-Repository = "https://github.com/tylt/cudag"
-Issues = "https://github.com/tylt/cudag/issues"
+Homepage = "https://github.com/claimhawk/pypi-cudag"
+Documentation = "https://github.com/claimhawk/pypi-cudag#readme"
+Repository = "https://github.com/claimhawk/pypi-cudag"
+Issues = "https://github.com/claimhawk/pypi-cudag/issues"
 
 [project.scripts]
 cudag = "cudag.cli.main:cli"

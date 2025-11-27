@@ -107,6 +107,40 @@ def _parse_tolerance(value: int | list[int]) -> tuple[int, int]:
     return tuple(value)  # type: ignore[return-value]
 
 
+def _wrap_text(text: str, font: Any, max_width: int, draw: Any) -> list[str]:
+    """Wrap text to fit within max_width pixels.
+
+    Args:
+        text: The text to wrap.
+        font: PIL ImageFont to use for measuring.
+        max_width: Maximum width in pixels.
+        draw: PIL ImageDraw for measuring text.
+
+    Returns:
+        List of wrapped lines.
+    """
+    words = text.split()
+    lines = []
+    current_line: list[str] = []
+
+    for word in words:
+        test_line = " ".join(current_line + [word])
+        bbox = draw.textbbox((0, 0), test_line, font=font)
+        width = bbox[2] - bbox[0]
+
+        if width <= max_width:
+            current_line.append(word)
+        else:
+            if current_line:
+                lines.append(" ".join(current_line))
+            current_line = [word]
+
+    if current_line:
+        lines.append(" ".join(current_line))
+
+    return lines if lines else [""]
+
+
 def annotate_test_image(
     image_path: Path,
     action: str,
@@ -119,7 +153,7 @@ def annotate_test_image(
     Draws:
     - Red crosshair at the click location
     - Action label near the click point
-    - Extends canvas with white bar at bottom for prompt text
+    - Extends canvas with white bar at bottom for prompt text (with wrapping)
 
     Args:
         image_path: Path to the original test image.
@@ -138,8 +172,27 @@ def annotate_test_image(
     original = Image.open(image_path).convert("RGB")
     orig_width, orig_height = original.size
 
+    # Try to load a font, fall back to default
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 12)
+    except (OSError, IOError):
+        font = ImageFont.load_default()
+
+    # Create temporary draw to measure text for wrapping
+    temp_img = Image.new("RGB", (1, 1))
+    temp_draw = ImageDraw.Draw(temp_img)
+
+    # Wrap the prompt text to fit image width (with margins)
+    margin = 10
+    max_text_width = orig_width - margin * 2
+    prompt_text = f"Prompt: {prompt}"
+    wrapped_lines = _wrap_text(prompt_text, font, max_text_width, temp_draw)
+
+    # Calculate bar height based on number of lines (line height ~18px + action line)
+    line_height = 18
+    bar_height = (len(wrapped_lines) * line_height) + line_height + 8  # +8 for padding
+
     # Create new canvas with extra height for prompt and action info
-    bar_height = 44  # Two lines of text
     new_height = orig_height + bar_height
     img = Image.new("RGB", (orig_width, new_height), (255, 255, 255))
 
@@ -163,20 +216,15 @@ def annotate_test_image(
         width=2,
     )
 
-    # Try to load a font, fall back to default
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 12)
-    except (OSError, IOError):
-        font = ImageFont.load_default()
-
-    # Draw prompt text in the extended area below the original image
-    prompt_y = orig_height + 4
-    draw.text((5, prompt_y), f"Prompt: {prompt}", fill=(0, 0, 0), font=font)
+    # Draw wrapped prompt text in the extended area below the original image
+    current_y = orig_height + 4
+    for line in wrapped_lines:
+        draw.text((5, current_y), line, fill=(0, 0, 0), font=font)
+        current_y += line_height
 
     # Draw action and coordinates below the prompt
-    action_y = orig_height + 22
     action_text = f"Action: {action}  Coords: ({x}, {y})"
-    draw.text((5, action_y), action_text, fill=(255, 0, 0), font=font)
+    draw.text((5, current_y), action_text, fill=(255, 0, 0), font=font)
 
     # Determine output path
     if output_path is None:
@@ -395,20 +443,30 @@ class DatasetBuilder:
             index += 1
             task_idx += 1
 
-        # Generate annotations for a sample of test cases
+        # Generate annotations - stratified by task type (2 per type)
         annotated_count = 0
-        if self.config.annotation_enabled and self.config.annotation_ratio > 0:
-            annotation_count = max(1, int(len(test_cases) * self.config.annotation_ratio))
-            # Select indices to annotate (evenly distributed)
-            indices_to_annotate = set(
-                range(0, len(test_cases), max(1, len(test_cases) // annotation_count))
-            )
+        if self.config.annotation_enabled:
+            annotations_per_type = 2
 
-            for idx in indices_to_annotate:
+            # Group indices by task type
+            indices_by_type: dict[str, list[int]] = {}
+            for idx, test_case in enumerate(raw_test_cases):
+                task_type = test_case.metadata.get("task_type", "unknown")
+                if task_type not in indices_by_type:
+                    indices_by_type[task_type] = []
+                indices_by_type[task_type].append(idx)
+
+            # Select indices to annotate (2 per task type)
+            indices_to_annotate: set[int] = set()
+            for task_type, indices in indices_by_type.items():
+                # Take first N indices for this task type
+                for idx in indices[:annotations_per_type]:
+                    indices_to_annotate.add(idx)
+
+            for idx in sorted(indices_to_annotate):
                 if idx >= len(raw_test_cases):
                     continue
                 test_case = raw_test_cases[idx]
-                record = test_cases[idx]
 
                 # Get action and coordinates
                 action = test_case.expected_action.get("arguments", {}).get("action", "click")

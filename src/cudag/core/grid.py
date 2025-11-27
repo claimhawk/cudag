@@ -29,7 +29,7 @@ T = TypeVar("T")
 class GridGeometry:
     """Defines the physical layout of a grid.
 
-    All measurements are in pixels.
+    All measurements are in pixels. Gaps can be float for sub-pixel accuracy.
     """
 
     x: int
@@ -50,11 +50,11 @@ class GridGeometry:
     cell_height: int
     """Height of each cell."""
 
-    row_gap: int = 0
-    """Gap between rows in pixels."""
+    row_gap: float = 0
+    """Gap between rows in pixels (can be float)."""
 
-    col_gap: int = 0
-    """Gap between columns in pixels."""
+    col_gap: float = 0
+    """Gap between columns in pixels (can be float)."""
 
     @property
     def width(self) -> int:
@@ -123,8 +123,9 @@ class GridGeometry:
         Returns:
             (x, y) position of cell top-left corner
         """
-        x = self.x + col * (self.cell_width + self.col_gap)
-        y = self.y + row * (self.cell_height + self.row_gap)
+        # Use float math then round to avoid drift with fractional gaps
+        x = round(self.x + col * (self.cell_width + self.col_gap))
+        y = round(self.y + row * (self.cell_height + self.row_gap))
         return (x, y)
 
     def cell_center(self, row: int, col: int) -> tuple[int, int]:

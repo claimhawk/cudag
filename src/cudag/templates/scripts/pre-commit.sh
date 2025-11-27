@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Copyright (c) 2025 Tylt LLC. All rights reserved.
+# Derivative works may be released by researchers,
+# but original files may not be redistributed or used beyond research purposes.
+
+set -euo pipefail
+
+mode="${1:-staged}"
+
+if [ "$mode" = "--help" ] || [ "$mode" = "-h" ]; then
+  echo "Usage: $0 [--all]" >&2
+  echo "  --all   Run checks against all tracked Python files instead of staged ones." >&2
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$repo_root"
+
+if [ "$mode" = "--all" ]; then
+  py_targets=$(git ls-files -- '*.py' 2>/dev/null || find . -name '*.py' -type f)
+  scope_label="all Python files"
+else
+  py_targets=$(git diff --cached --name-only --diff-filter=ACM -- '*.py' 2>/dev/null || true)
+  scope_label="staged Python files"
+fi
+
+if [ -z "$py_targets" ]; then
+  echo "No ${scope_label}. Skipping lint/type checks."
+  exit 0
+fi
+
+python_bin="python"
+if ! command -v "$python_bin" >/dev/null 2>&1; then
+  python_bin="python3"
+fi
+
+if command -v ruff >/dev/null 2>&1; then
+  ruff_cmd="ruff"
+else
+  ruff_cmd="$python_bin -m ruff"
+fi
+
+if command -v mypy >/dev/null 2>&1; then
+  mypy_cmd="mypy"
+else
+  mypy_cmd="$python_bin -m mypy"
+fi
+
+echo "Running ruff (lexical checks) on ${scope_label}..."
+printf '%s\n' "$py_targets" | xargs -r $ruff_cmd check
+
+echo "Running mypy (syntax & types) on ${scope_label}..."
+printf '%s\n' "$py_targets" | xargs -r $mypy_cmd
+
+echo "Generating documentation..."
+$python_bin -m pdoc --html --output-dir docs . --force 2>/dev/null || echo "Note: pdoc not installed, skipping docs"
+
+echo ""
+echo "✓ All checks passed!"

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Copyright (c) 2025 Tylt LLC. All rights reserved.
+# Derivative works may be released by researchers,
+# but original files may not be redistributed or used beyond research purposes.
+
+# Usage:
+#   ./scripts/upload.sh [dataset_dir]       # Upload to Modal volume
+#   ./scripts/upload.sh --dry [dataset_dir] # Dry run, show what would be uploaded
+
+set -euo pipefail
+
+DRY_RUN=false
+DATASET_DIR=""
+
+# Parse args
+for arg in "$@"; do
+    if [[ "$arg" == "--dry" ]]; then
+        DRY_RUN=true
+    elif [[ -z "$DATASET_DIR" && ! "$arg" =~ ^-- ]]; then
+        DATASET_DIR="$arg"
+    fi
+done
+
+echo "========================================"
+echo "STAGE 2: Upload Dataset"
+echo "========================================"
+echo ""
+
+if [[ -z "$DATASET_DIR" ]]; then
+    # Find most recent dataset
+    DATASET_DIR=$(ls -td datasets/*/ 2>/dev/null | head -1)
+    if [[ -z "$DATASET_DIR" ]]; then
+        echo "No dataset directory found. Specify path or run generate.sh first."
+        exit 1
+    fi
+fi
+
+DATASET_NAME=$(basename "$DATASET_DIR")
+echo "Dataset: $DATASET_NAME"
+echo "Path: $DATASET_DIR"
+echo ""
+
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo "[DRY RUN] Would upload: $DATASET_DIR"
+    exit 0
+fi
+
+# Upload via Modal
+echo "Uploading to Modal volume..."
+uvx --with cudag python -m cudag.modal_apps.upload "$DATASET_DIR"
+
+echo ""
+echo "Upload complete: $DATASET_NAME"
+
+echo ""
+echo "========================================"
+echo "Auto-starting extraction..."
+echo "========================================"
+echo ""
+
+exec ./scripts/extract.sh --dataset-name "$DATASET_NAME"

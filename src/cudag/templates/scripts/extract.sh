@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Copyright (c) 2025 Tylt LLC. All rights reserved.
+# Derivative works may be released by researchers,
+# but original files may not be redistributed or used beyond research purposes.
+
+# Pipeline: generate.sh -> upload.sh -> extract.sh -> preprocess.sh
+#
+# Usage:
+#   ./scripts/extract.sh --dataset-name <NAME>
+
+set -euo pipefail
+
+DATASET_NAME=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dataset-name)
+            DATASET_NAME="${2:-}"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "$DATASET_NAME" ]]; then
+    echo "Error: --dataset-name <NAME> is required"
+    exit 1
+fi
+
+echo "========================================"
+echo "STAGE 3: Extract Dataset"
+echo "========================================"
+echo ""
+echo "Dataset: $DATASET_NAME"
+echo ""
+
+# Find cudag's extract.py location and run via Modal
+CUDAG_PATH=$(uvx --with cudag python -c "import cudag.modal_apps.extract as e; print(e.__file__)")
+uvx modal run "$CUDAG_PATH" --dataset-name "$DATASET_NAME"
+
+echo ""
+echo "Extraction complete for: $DATASET_NAME"
+
+echo ""
+echo "========================================"
+echo "Auto-starting preprocessing..."
+echo "========================================"
+echo ""
+
+exec ./scripts/preprocess.sh --dataset-name "$DATASET_NAME"

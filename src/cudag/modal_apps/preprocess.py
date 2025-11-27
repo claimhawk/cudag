@@ -1,0 +1,441 @@
+#!/usr/bin/env python3
+# Copyright (c) 2025 Tylt LLC. All rights reserved.
+# Derivative works may be released by researchers,
+# but original files may not be redistributed or used beyond research purposes.
+
+"""
+CUDAG Dataset Preprocessing on Modal
+
+Preprocess the raw JSONL + images dataset on Modal's CPU instances.
+Saves preprocessed tensors to a Modal volume for reuse across training runs.
+
+Usage:
+    modal run preprocess.py --dataset-name my-dataset
+"""
+
+import json
+import sys
+from pathlib import Path
+
+import modal
+
+
+def _get_generator_name() -> str:
+    """Extract generator name from --dataset-name arg for dynamic app naming."""
+    for i, arg in enumerate(sys.argv):
+        if arg == "--dataset-name" and i + 1 < len(sys.argv):
+            ds_name = sys.argv[i + 1]
+            # Generator name is first part before dash (e.g., "desktop" from "desktop-mike-...")
+            return ds_name.split("-")[0] if ds_name else "cudag"
+    return "cudag"
+
+
+# Modal App Setup - dynamically named based on generator
+app = modal.App(f"{_get_generator_name()}-preprocess")
+
+# Volume - matches modal-volumes.md structure
+DEFAULT_VOLUME = "claimhawk-lora-training"
+VOLUME = modal.Volume.from_name(DEFAULT_VOLUME, create_if_missing=True)
+
+# Docker Image with Dependencies (CPU-only, no GPU needed)
+image = (
+    modal.Image.debian_slim(python_version="3.12")
+    .pip_install(
+        "torch==2.4.0",
+        "torchvision==0.19.0",
+    )
+    .pip_install(
+        "transformers>=4.57.0",
+        "qwen-vl-utils",
+        "Pillow>=10.0.0",
+        "numpy>=1.24.0",
+        "tqdm>=4.65.0",
+    )
+)
+
+
+@app.function(
+    image=image,
+    cpu=16,
+    memory=32768,  # 32GB RAM
+    timeout=7200,  # 2 hours max
+    volumes={
+        "/data": VOLUME,
+    },
+)
+def preprocess_dataset_impl(dataset_name: str):
+    """
+    Preprocess the dataset on Modal CPU instance.
+
+    Reads from: /data/datasets/{dataset_name}/
+    Writes to:  /data/preprocessed/{dataset_name}/
+    """
+    import torch
+    from PIL import Image
+    from qwen_vl_utils import process_vision_info
+    from tqdm import tqdm
+    from transformers import AutoProcessor
+
+    # Reload the mounted volume to see latest committed data
+    VOLUME.reload()
+
+    # Paths according to modal-volumes.md structure
+    data_root = Path("/data")
+    dataset_path = data_root / "datasets" / dataset_name
+    preprocessed_path = data_root / "preprocessed" / dataset_name
+
+    print(f"\n{'='*80}")
+    print(f"Starting CUDAG Preprocessing: {dataset_name}")
+    print(f"{'='*80}\n")
+    print(f"Dataset: {dataset_name}")
+    print(f"Dataset path: {dataset_path}")
+    print(f"Output path: {preprocessed_path}")
+
+    # Debug: List what's in the directory
+    print(f"\nListing contents of {dataset_path}:")
+    if dataset_path.exists():
+        all_files = list(dataset_path.iterdir())
+        print(f"Found {len(all_files)} items:")
+        for item in all_files[:20]:
+            print(f"   - {item.name} ({'dir' if item.is_dir() else 'file'})")
+    else:
+        print(f"Directory does not exist!")
+        print(f"Available in datasets/:")
+        datasets_dir = data_root / "datasets"
+        if datasets_dir.exists():
+            for item in datasets_dir.iterdir():
+                print(f"   - {item.name}")
+        raise FileNotFoundError(f"Dataset not found: {dataset_path}")
+
+    # Find train and val files
+    train_files = list(dataset_path.glob("train*.jsonl"))
+    val_files = list(dataset_path.glob("val*.jsonl"))
+    test_files = list(dataset_path.glob("test*.jsonl"))
+    data_files = list(dataset_path.glob("data.jsonl"))
+
+    def load_jsonl(path):
+        data = []
+        with open(path, "r") as f:
+            for line in f:
+                data.append(json.loads(line))
+        return data
+
+    # Priority: Use existing train/val or train/test splits if available
+    if train_files and (val_files or test_files):
+        train_path = train_files[0]
+        val_path = val_files[0] if val_files else test_files[0]
+        print(f"\nUsing existing dataset split:")
+        print(f"   Train: {train_path.name}")
+        print(f"   Val: {val_path.name}")
+        train_data = load_jsonl(train_path)
+        val_data = load_jsonl(val_path)
+    elif data_files:
+        print(f"\nFound single data.jsonl, auto-splitting 90/10...")
+        all_data = load_jsonl(data_files[0])
+        split_idx = int(len(all_data) * 0.9)
+        train_data = all_data[:split_idx]
+        val_data = all_data[split_idx:]
+    else:
+        raise FileNotFoundError(
+            f"Could not find train*.jsonl/val*.jsonl or data.jsonl in {dataset_path}"
+        )
+
+    print(f"\nDataset size:")
+    print(f"   Train samples: {len(train_data)}")
+    print(f"   Val samples: {len(val_data)}")
+
+    # Load Processor
+    print(f"\n{'='*80}")
+    print("Loading Processor")
+    print(f"{'='*80}\n")
+
+    model_name = "Qwen/Qwen3-VL-8B-Instruct"
+    print(f"Loading processor: {model_name}")
+    processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+    print("Processor loaded")
+
+    # Cache Image Embeddings
+    print(f"\n{'='*80}")
+    print("Caching Image Embeddings")
+    print(f"{'='*80}\n")
+
+    unique_images = set()
+    for sample in train_data + val_data:
+        unique_images.add(sample["image"])
+
+    print(
+        f"Found {len(unique_images)} unique images (from {len(train_data) + len(val_data)} total samples)"
+    )
+    print(
+        f"Reuse ratio: {(len(train_data) + len(val_data)) / max(len(unique_images), 1):.1f}x"
+    )
+
+    image_cache = {}
+
+    print("\nProcessing unique images...")
+    for img_path in tqdm(sorted(unique_images), desc="Caching images"):
+        img_path_str = str(img_path)
+
+        # Handle nested paths - strip dataset name prefix if present
+        base_name = dataset_name.split("/")[0] if "/" in dataset_name else dataset_name
+        if img_path_str.startswith(f"{base_name}/"):
+            img_path_str = img_path_str[len(base_name) + 1 :]
+
+        full_path = dataset_path / img_path_str
+        if not full_path.exists():
+            print(f"Warning: Image not found: {full_path}")
+            continue
+
+        image = Image.open(full_path)
+        image_inputs, _ = process_vision_info(
+            [
+                {
+                    "role": "user",
+                    "content": [{"type": "image", "image": f"file://{full_path}"}],
+                }
+            ],
+            image_patch_size=16,
+        )
+
+        image_cache[img_path] = {
+            "pixel_values": image_inputs[0] if image_inputs else None,
+            "image": image,
+        }
+
+    print(f"Cached {len(image_cache)} images")
+
+    # Preprocess Data
+    print(f"\n{'='*80}")
+    print("Preprocessing Data")
+    print(f"{'='*80}\n")
+
+    def prepare_sample(sample, image_cache):
+        """Prepare a single sample for training."""
+        img_path = sample["image"]
+        if img_path not in image_cache:
+            raise FileNotFoundError(f"Image not in cache: {img_path}")
+
+        cached_image = image_cache[img_path]
+        old_conversations = sample["conversations"]
+
+        # Convert to Qwen-VL format, preserving system prompts from dataset
+        messages = []
+        for msg in old_conversations:
+            if msg["from"] == "system":
+                role = "system"
+            elif msg["from"] == "human":
+                role = "user"
+            else:
+                role = "assistant"
+
+            content_list = []
+            value = msg["value"]
+
+            if "<image>" in value:
+                content_list.append({"type": "image"})
+                text = value.replace("<image>", "").strip()
+                if text:
+                    content_list.append({"type": "text", "text": text})
+            else:
+                content_list.append({"type": "text", "text": value})
+
+            messages.append({"role": role, "content": content_list})
+
+        text = processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=False
+        )
+
+        image_inputs = (
+            [cached_image["pixel_values"]]
+            if cached_image["pixel_values"] is not None
+            else None
+        )
+
+        model_inputs = processor(
+            text=[text],
+            images=image_inputs,
+            videos=None,
+            return_tensors="pt",
+            padding=False,
+            do_resize=False,
+        )
+
+        input_ids = (
+            model_inputs["input_ids"][0]
+            if isinstance(model_inputs["input_ids"][0], torch.Tensor)
+            else torch.tensor(model_inputs["input_ids"][0])
+        )
+        attention_mask = (
+            model_inputs["attention_mask"][0]
+            if isinstance(model_inputs["attention_mask"][0], torch.Tensor)
+            else torch.tensor(model_inputs["attention_mask"][0])
+        )
+
+        # Create labels: Only train on assistant responses
+        IGNORE_INDEX = -100
+        labels = torch.full_like(input_ids, IGNORE_INDEX)
+
+        input_ids_list = input_ids.tolist()
+        L = len(input_ids_list)
+        pos = 0
+
+        while pos < L:
+            # Look for <|im_start|>assistant (token ID 77091)
+            if input_ids_list[pos] == 77091:
+                ans_start = pos + 2
+                ans_end = ans_start
+
+                # Find <|im_end|> (token ID 151645)
+                while ans_end < L and input_ids_list[ans_end] != 151645:
+                    ans_end += 1
+
+                if ans_end < L:
+                    labels[ans_start : ans_end + 2] = input_ids[ans_start : ans_end + 2]
+                    pos = ans_end
+            pos += 1
+
+        result = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
+        }
+
+        if "pixel_values" in model_inputs:
+            result["pixel_values"] = model_inputs["pixel_values"]
+            result["image_grid_thw"] = model_inputs["image_grid_thw"]
+
+        return result
+
+    # Process training data
+    print("Processing training data...")
+    train_processed = []
+    train_output_dir = preprocessed_path / "train"
+    train_output_dir.mkdir(parents=True, exist_ok=True)
+
+    BATCH_SIZE = 8
+    batch_buffer = []
+    batch_indices = []
+
+    for i, sample in enumerate(tqdm(train_data, desc="Train")):
+        try:
+            processed = prepare_sample(sample, image_cache)
+
+            processed_cpu = {
+                "input_ids": processed["input_ids"].cpu(),
+                "attention_mask": processed["attention_mask"].cpu(),
+                "labels": processed["labels"].cpu(),
+            }
+            if "pixel_values" in processed:
+                processed_cpu["pixel_values"] = processed["pixel_values"].cpu()
+                processed_cpu["image_grid_thw"] = processed["image_grid_thw"].cpu()
+
+            batch_buffer.append(processed_cpu)
+            batch_indices.append(i)
+
+            if len(batch_buffer) >= BATCH_SIZE or i == len(train_data) - 1:
+                for batch_idx, batch_sample in zip(batch_indices, batch_buffer):
+                    sample_path = train_output_dir / f"sample_{batch_idx:06d}.pt"
+                    torch.save(batch_sample, sample_path)
+                    train_processed.append(str(sample_path))
+
+                batch_buffer = []
+                batch_indices = []
+
+        except Exception as e:
+            print(f"\nError processing train sample {i}: {e}")
+            raise
+
+    # Process validation data
+    print("\nProcessing validation data...")
+    val_processed = []
+    val_output_dir = preprocessed_path / "val"
+    val_output_dir.mkdir(parents=True, exist_ok=True)
+
+    batch_buffer = []
+    batch_indices = []
+
+    for i, sample in enumerate(tqdm(val_data, desc="Val")):
+        try:
+            processed = prepare_sample(sample, image_cache)
+
+            processed_cpu = {
+                "input_ids": processed["input_ids"].cpu(),
+                "attention_mask": processed["attention_mask"].cpu(),
+                "labels": processed["labels"].cpu(),
+            }
+            if "pixel_values" in processed:
+                processed_cpu["pixel_values"] = processed["pixel_values"].cpu()
+                processed_cpu["image_grid_thw"] = processed["image_grid_thw"].cpu()
+
+            batch_buffer.append(processed_cpu)
+            batch_indices.append(i)
+
+            if len(batch_buffer) >= BATCH_SIZE or i == len(val_data) - 1:
+                for batch_idx, batch_sample in zip(batch_indices, batch_buffer):
+                    sample_path = val_output_dir / f"sample_{batch_idx:06d}.pt"
+                    torch.save(batch_sample, sample_path)
+                    val_processed.append(str(sample_path))
+
+                batch_buffer = []
+                batch_indices = []
+
+        except Exception as e:
+            print(f"\nError processing val sample {i}: {e}")
+            raise
+
+    # Save metadata
+    metadata = {
+        "train_samples": len(train_processed),
+        "val_samples": len(val_processed),
+        "model_name": model_name,
+        "dataset_name": dataset_name,
+    }
+
+    metadata_path = preprocessed_path / "metadata.json"
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"\nPreprocessing complete!")
+    print(f"   Train samples: {len(train_processed)}")
+    print(f"   Val samples: {len(val_processed)}")
+
+    total_size = (
+        sum(f.stat().st_size for f in preprocessed_path.rglob("*.pt")) / (1024**3)
+    )
+    print(f"   Total preprocessed size: {total_size:.2f} GB")
+
+    # Commit volume changes
+    VOLUME.commit()
+
+    print(f"\nPreprocessed data saved to Modal volume: preprocessed/{dataset_name}")
+
+    print(f"\n{'='*80}")
+    print("PREPROCESSING COMPLETE!")
+    print(f"{'='*80}\n")
+
+    return {
+        "train_samples": len(train_processed),
+        "val_samples": len(val_processed),
+        "total_size_gb": total_size,
+    }
+
+
+@app.local_entrypoint()
+def main(dataset_name: str):
+    """
+    Local entrypoint for running preprocessing.
+
+    Usage:
+        modal run preprocess.py --dataset-name my-dataset
+    """
+    print(f"\n{'='*80}")
+    print("Submitting preprocessing job to Modal...")
+    print(f"Dataset: {dataset_name}")
+    print(f"{'='*80}\n")
+
+    result = preprocess_dataset_impl.remote(dataset_name)
+
+    print(f"\n{'='*80}")
+    print("Preprocessing job completed!")
+    print(f"{'='*80}\n")
+    print(f"Results: {result}")

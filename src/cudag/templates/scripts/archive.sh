@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Copyright (c) 2025 Tylt LLC. All rights reserved.
+# Derivative works may be released by researchers,
+# but original files may not be redistributed or used beyond research purposes.
+
+# Archive a dataset directory into a tar.gz file
+#
+# Usage:
+#   ./scripts/archive.sh [dataset_dir]
+
+set -euo pipefail
+
+DATASET_DIR="${1:-}"
+
+if [[ -z "$DATASET_DIR" ]]; then
+    # Find most recent dataset
+    DATASET_DIR=$(ls -td datasets/*/ 2>/dev/null | head -1)
+    if [[ -z "$DATASET_DIR" ]]; then
+        echo "No dataset directory found. Specify path or run generate.sh first."
+        exit 1
+    fi
+fi
+
+DATASET_NAME=$(basename "$DATASET_DIR")
+ARCHIVE_NAME="datasets/${DATASET_NAME}.tar.gz"
+
+echo "Archiving: $DATASET_DIR"
+echo "Output: $ARCHIVE_NAME"
+
+tar -czvf "$ARCHIVE_NAME" -C "$(dirname "$DATASET_DIR")" "$DATASET_NAME"
+
+echo ""
+echo "Archive created: $ARCHIVE_NAME"

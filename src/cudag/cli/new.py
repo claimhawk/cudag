@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import shutil
+import stat
 from pathlib import Path
 from textwrap import dedent
 
@@ -34,6 +36,7 @@ def create_project(name: str, parent_dir: Path) -> Path:
     (project_dir / "datasets").mkdir(exist_ok=True)
     (project_dir / "models").mkdir(exist_ok=True)
     (project_dir / "scripts").mkdir(exist_ok=True)
+    (project_dir / "modal_apps").mkdir(exist_ok=True)
 
     # Create files
     _write_pyproject(project_dir, project_name, module_name)
@@ -47,6 +50,7 @@ def create_project(name: str, parent_dir: Path) -> Path:
     _write_dataset_config(project_dir, project_name)
     _write_readme(project_dir, project_name)
     _write_scripts(project_dir, module_name)
+    _write_modal_apps(project_dir)
     _write_makefile(project_dir, module_name)
     _write_copyright(project_dir)
     _init_git(project_dir)
@@ -495,320 +499,33 @@ def _write_readme(project_dir: Path, project_name: str) -> None:
     (project_dir / "README.md").write_text(content)
 
 
+def _get_templates_dir() -> Path:
+    """Get the path to the templates directory."""
+    return Path(__file__).parent.parent / "templates"
+
+
 def _write_scripts(project_dir: Path, module_name: str) -> None:
-    """Write shell scripts for the project."""
-    import stat
+    """Copy shell scripts from templates to the project."""
+    templates_dir = _get_templates_dir()
+    scripts_template_dir = templates_dir / "scripts"
 
-    # generate.sh
-    generate_sh = dedent(f'''\
-        #!/usr/bin/env bash
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
-        # but original files may not be redistributed or used beyond research purposes.
+    # Copy all script files from templates
+    for script_file in scripts_template_dir.glob("*.sh"):
+        dest_path = project_dir / "scripts" / script_file.name
+        shutil.copy(script_file, dest_path)
+        # Make executable
+        dest_path.chmod(dest_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-        # Usage:
-        #   ./scripts/generate.sh [options]        # Generate and auto-upload
-        #   ./scripts/generate.sh --dry [options]  # Generate only, no upload
 
-        set -euo pipefail
+def _write_modal_apps(project_dir: Path) -> None:
+    """Copy modal_apps from templates to the project."""
+    templates_dir = _get_templates_dir()
+    modal_apps_template_dir = templates_dir / "modal_apps"
 
-        DRY_RUN=false
-        EXTRA_ARGS=()
-
-        # Parse args - extract --dry, pass everything else through
-        for arg in "$@"; do
-            if [[ "$arg" == "--dry" ]]; then
-                DRY_RUN=true
-            else
-                EXTRA_ARGS+=("$arg")
-            fi
-        done
-
-        echo "========================================"
-        echo "STAGE 1: Generate Dataset"
-        echo "========================================"
-        echo ""
-
-        if [[ "$DRY_RUN" == "true" ]]; then
-            echo "[DRY RUN] Will generate but NOT upload"
-            echo ""
-        fi
-
-        # Run the dataset generation
-        # Use --with to add cudag from local path without needing to install this project
-        if [[ ${{#EXTRA_ARGS[@]}} -gt 0 ]]; then
-            uv run --with pillow python generator.py "${{EXTRA_ARGS[@]}}"
-        else
-            uv run --with pillow python generator.py
-        fi
-
-        if [[ $? -ne 0 ]]; then
-            echo ""
-            echo "Dataset generation failed"
-            exit 1
-        fi
-
-        # Find the most recently created dataset directory
-        LATEST_DATASET=$(ls -td datasets/*/ 2>/dev/null | head -1)
-
-        if [[ -z "$LATEST_DATASET" ]]; then
-            echo ""
-            echo "No dataset directory found"
-            exit 1
-        fi
-
-        DATASET_NAME=$(basename "$LATEST_DATASET")
-        echo ""
-        echo "Generated dataset: $DATASET_NAME"
-
-        if [[ "$DRY_RUN" == "true" ]]; then
-            echo ""
-            echo "[DRY RUN] Skipping upload"
-            echo ""
-            echo "To upload manually:"
-            echo "  ./scripts/upload.sh datasets/$DATASET_NAME"
-            exit 0
-        fi
-
-        echo ""
-        echo "========================================"
-        echo "Auto-starting upload..."
-        echo "========================================"
-        echo ""
-
-        exec ./scripts/upload.sh "datasets/$DATASET_NAME"
-    ''')
-    generate_path = project_dir / "scripts" / "generate.sh"
-    generate_path.write_text(generate_sh)
-    generate_path.chmod(generate_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-    # build.sh
-    build_sh = dedent('''\
-        #!/usr/bin/env bash
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
-        # but original files may not be redistributed or used beyond research purposes.
-
-        set -euo pipefail
-
-        repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-        cd "$repo_root"
-
-        "$repo_root/scripts/pre-commit.sh" --all
-    ''')
-    build_path = project_dir / "scripts" / "build.sh"
-    build_path.write_text(build_sh)
-    build_path.chmod(build_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-    # pre-commit.sh
-    precommit_sh = dedent('''\
-        #!/usr/bin/env bash
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
-        # but original files may not be redistributed or used beyond research purposes.
-
-        set -euo pipefail
-
-        mode="${1:-staged}"
-
-        if [ "$mode" = "--help" ] || [ "$mode" = "-h" ]; then
-          echo "Usage: $0 [--all]" >&2
-          echo "  --all   Run checks against all tracked Python files instead of staged ones." >&2
-          exit 0
-        fi
-
-        repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-        cd "$repo_root"
-
-        if [ "$mode" = "--all" ]; then
-          py_targets=$(git ls-files -- '*.py' 2>/dev/null || find . -name '*.py' -type f)
-          scope_label="all Python files"
-        else
-          py_targets=$(git diff --cached --name-only --diff-filter=ACM -- '*.py' 2>/dev/null || true)
-          scope_label="staged Python files"
-        fi
-
-        if [ -z "$py_targets" ]; then
-          echo "No ${scope_label}. Skipping lint/type checks."
-          exit 0
-        fi
-
-        python_bin="python"
-        if ! command -v "$python_bin" >/dev/null 2>&1; then
-          python_bin="python3"
-        fi
-
-        if command -v ruff >/dev/null 2>&1; then
-          ruff_cmd="ruff"
-        else
-          ruff_cmd="$python_bin -m ruff"
-        fi
-
-        if command -v mypy >/dev/null 2>&1; then
-          mypy_cmd="mypy"
-        else
-          mypy_cmd="$python_bin -m mypy"
-        fi
-
-        echo "Running ruff (lexical checks) on ${scope_label}..."
-        printf '%s\\n' "$py_targets" | xargs -r $ruff_cmd check
-
-        echo "Running mypy (syntax & types) on ${scope_label}..."
-        printf '%s\\n' "$py_targets" | xargs -r $mypy_cmd
-    ''')
-    precommit_path = project_dir / "scripts" / "pre-commit.sh"
-    precommit_path.write_text(precommit_sh)
-    precommit_path.chmod(precommit_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-    # upload.sh
-    upload_sh = dedent('''\
-        #!/usr/bin/env bash
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
-        # but original files may not be redistributed or used beyond research purposes.
-
-        # Usage:
-        #   ./scripts/upload.sh [dataset_dir]       # Upload to Modal volume
-        #   ./scripts/upload.sh --dry [dataset_dir] # Dry run, show what would be uploaded
-
-        set -euo pipefail
-
-        DRY_RUN=false
-        DATASET_DIR=""
-
-        # Parse args
-        for arg in "$@"; do
-            if [[ "$arg" == "--dry" ]]; then
-                DRY_RUN=true
-            elif [[ -z "$DATASET_DIR" && ! "$arg" =~ ^-- ]]; then
-                DATASET_DIR="$arg"
-            fi
-        done
-
-        echo "========================================"
-        echo "STAGE 2: Upload Dataset"
-        echo "========================================"
-        echo ""
-
-        if [[ -z "$DATASET_DIR" ]]; then
-            # Find most recent dataset
-            DATASET_DIR=$(ls -td datasets/*/ 2>/dev/null | head -1)
-            if [[ -z "$DATASET_DIR" ]]; then
-                echo "No dataset directory found. Specify path or run generate.sh first."
-                exit 1
-            fi
-        fi
-
-        DATASET_NAME=$(basename "$DATASET_DIR")
-        echo "Dataset: $DATASET_NAME"
-        echo "Path: $DATASET_DIR"
-        echo ""
-
-        if [[ "$DRY_RUN" == "true" ]]; then
-            echo "[DRY RUN] Would upload: $DATASET_DIR"
-            exit 0
-        fi
-
-        # Upload via Modal (customize this for your setup)
-        echo "Uploading to Modal volume..."
-        uv run python -m modal_apps.upload "$DATASET_DIR"
-
-        echo ""
-        echo "Upload complete: $DATASET_NAME"
-    ''')
-    upload_path = project_dir / "scripts" / "upload.sh"
-    upload_path.write_text(upload_sh)
-    upload_path.chmod(upload_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-    # preprocess.sh
-    preprocess_sh = dedent('''\
-        #!/usr/bin/env bash
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
-        # but original files may not be redistributed or used beyond research purposes.
-
-        # Pipeline: generate.sh -> upload.sh -> preprocess.sh
-        #
-        # Usage:
-        #   ./scripts/preprocess.sh --dataset-name <NAME>
-
-        set -euo pipefail
-
-        DATASET_NAME=""
-
-        while [[ $# -gt 0 ]]; do
-            case "$1" in
-                --dataset-name)
-                    DATASET_NAME="${2:-}"
-                    shift 2
-                    ;;
-                *)
-                    shift
-                    ;;
-            esac
-        done
-
-        if [[ -z "$DATASET_NAME" ]]; then
-            echo "Error: --dataset-name <NAME> is required"
-            exit 1
-        fi
-
-        echo "========================================"
-        echo "STAGE 3: Preprocess Dataset"
-        echo "========================================"
-        echo ""
-        echo "Dataset: $DATASET_NAME"
-        echo ""
-
-        # Run preprocessing (customize for your setup)
-        uvx modal run --detach modal_apps/preprocess.py --dataset-name "$DATASET_NAME"
-
-        echo ""
-        echo "Preprocessing job started for: $DATASET_NAME"
-    ''')
-    preprocess_path = project_dir / "scripts" / "preprocess.sh"
-    preprocess_path.write_text(preprocess_sh)
-    preprocess_path.chmod(preprocess_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-    # archive.sh
-    archive_sh = dedent('''\
-        #!/usr/bin/env bash
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
-        # but original files may not be redistributed or used beyond research purposes.
-
-        # Archive a dataset directory into a tar.gz file
-        #
-        # Usage:
-        #   ./scripts/archive.sh [dataset_dir]
-
-        set -euo pipefail
-
-        DATASET_DIR="${1:-}"
-
-        if [[ -z "$DATASET_DIR" ]]; then
-            # Find most recent dataset
-            DATASET_DIR=$(ls -td datasets/*/ 2>/dev/null | head -1)
-            if [[ -z "$DATASET_DIR" ]]; then
-                echo "No dataset directory found. Specify path or run generate.sh first."
-                exit 1
-            fi
-        fi
-
-        DATASET_NAME=$(basename "$DATASET_DIR")
-        ARCHIVE_NAME="datasets/${DATASET_NAME}.tar.gz"
-
-        echo "Archiving: $DATASET_DIR"
-        echo "Output: $ARCHIVE_NAME"
-
-        tar -czvf "$ARCHIVE_NAME" -C "$(dirname "$DATASET_DIR")" "$DATASET_NAME"
-
-        echo ""
-        echo "Archive created: $ARCHIVE_NAME"
-    ''')
-    archive_path = project_dir / "scripts" / "archive.sh"
-    archive_path.write_text(archive_sh)
-    archive_path.chmod(archive_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    # Copy all Python files from templates
+    for py_file in modal_apps_template_dir.glob("*.py"):
+        dest_path = project_dir / "modal_apps" / py_file.name
+        shutil.copy(py_file, dest_path)
 
 
 def _write_makefile(project_dir: Path, module_name: str) -> None:

@@ -138,8 +138,8 @@ def annotate_test_image(
     original = Image.open(image_path).convert("RGB")
     orig_width, orig_height = original.size
 
-    # Create new canvas with extra height for prompt bar
-    bar_height = 28
+    # Create new canvas with extra height for prompt and action info
+    bar_height = 44  # Two lines of text
     new_height = orig_height + bar_height
     img = Image.new("RGB", (orig_width, new_height), (255, 255, 255))
 
@@ -166,24 +166,17 @@ def annotate_test_image(
     # Try to load a font, fall back to default
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 12)
-        prompt_font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 14)
     except (OSError, IOError):
         font = ImageFont.load_default()
-        prompt_font = font
-
-    # Draw action label near click point
-    action_text = f"{action} ({x}, {y})"
-    label_x = min(x + crosshair_size + 5, orig_width - 100)
-    label_y = max(y - 8, 5)
-
-    # Background for label
-    bbox = draw.textbbox((label_x, label_y), action_text, font=font)
-    draw.rectangle([bbox[0] - 2, bbox[1] - 2, bbox[2] + 2, bbox[3] + 2], fill=(255, 255, 255))
-    draw.text((label_x, label_y), action_text, fill=(255, 0, 0), font=font)
 
     # Draw prompt text in the extended area below the original image
-    prompt_y = orig_height + 6
-    draw.text((5, prompt_y), f"Prompt: {prompt}", fill=(0, 0, 0), font=prompt_font)
+    prompt_y = orig_height + 4
+    draw.text((5, prompt_y), f"Prompt: {prompt}", fill=(0, 0, 0), font=font)
+
+    # Draw action and coordinates below the prompt
+    action_y = orig_height + 22
+    action_text = f"Action: {action}  Coords: ({x}, {y})"
+    draw.text((5, action_y), action_text, fill=(255, 0, 0), font=font)
 
     # Determine output path
     if output_path is None:

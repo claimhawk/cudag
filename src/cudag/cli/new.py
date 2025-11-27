@@ -73,12 +73,17 @@ def _write_pyproject(project_dir: Path, project_name: str, module_name: str) -> 
         dependencies = [
             "cudag",
             "pillow>=10.0.0",
+            "pyyaml>=6.0",
         ]
+
+        [tool.uv.sources]
+        cudag = {{ path = "../../cudag", editable = true }}
 
         [project.optional-dependencies]
         dev = [
             "ruff>=0.1.0",
             "mypy>=1.0.0",
+            "types-PyYAML>=6.0.0",
         ]
 
         [tool.hatch.build.targets.wheel]

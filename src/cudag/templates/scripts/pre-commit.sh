@@ -31,31 +31,14 @@ if [ -z "$py_targets" ]; then
   exit 0
 fi
 
-python_bin="python"
-if ! command -v "$python_bin" >/dev/null 2>&1; then
-  python_bin="python3"
-fi
-
-if command -v ruff >/dev/null 2>&1; then
-  ruff_cmd="ruff"
-else
-  ruff_cmd="$python_bin -m ruff"
-fi
-
-if command -v mypy >/dev/null 2>&1; then
-  mypy_cmd="mypy"
-else
-  mypy_cmd="$python_bin -m mypy"
-fi
+# Use uv run to execute in the project's venv with dev dependencies (Python 3.12)
+UV_RUN="uv run --python 3.12 --extra dev"
 
 echo "Running ruff (lexical checks) on ${scope_label}..."
-printf '%s\n' "$py_targets" | xargs -r $ruff_cmd check
+printf '%s\n' "$py_targets" | xargs $UV_RUN ruff check
 
 echo "Running mypy (syntax & types) on ${scope_label}..."
-printf '%s\n' "$py_targets" | xargs -r $mypy_cmd
-
-echo "Generating documentation..."
-$python_bin -m pdoc --html --output-dir docs . --force 2>/dev/null || echo "Note: pdoc not installed, skipping docs"
+printf '%s\n' "$py_targets" | xargs $UV_RUN mypy
 
 echo ""
 echo "✓ All checks passed!"

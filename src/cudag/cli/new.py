@@ -339,16 +339,21 @@ def _write_example_task(project_dir: Path, module_name: str) -> None:
         # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
-        """Example task - demonstrates 1-image-to-many-samples pattern.
+        """Example task - demonstrates 1-image-to-many-samples pattern with distributions.
 
         Key insight: One rendered image can produce MULTIPLE training samples.
         This is more efficient than generating a new image for each sample.
 
         IMPORTANT: All coordinates in training data MUST be normalized RU (0-1000).
         Use normalize_coord() before passing to ToolCall.
+
+        Distribution Pattern:
+        - Configure distributions in dataset.yaml under task_distributions
+        - Use ctx.config or DatasetConfig.sample_distribution_type() to select type
+        - Generate samples according to the distribution (normal, edge_case, adversarial)
         """
 
-        from cudag.core import BaseTask, TaskContext, TaskSample, TestCase
+        from cudag.core import BaseTask, DatasetConfig, TaskContext, TaskSample, TestCase
         from cudag.core.coords import normalize_coord
         from cudag.prompts.tools import ToolCall
 
@@ -356,57 +361,121 @@ def _write_example_task(project_dir: Path, module_name: str) -> None:
 
 
         class ExampleTask(BaseTask):
-            """Example task demonstrating 1:N image-to-samples pattern.
+            """Example task demonstrating 1:N image-to-samples pattern with distributions.
 
             One Screen can have many Tasks. Each Task:
             - Belongs to a Screen
             - Has a task_type identifier
             - Can generate multiple samples from one rendered image
+            - Supports distribution-based sample generation
 
             Example use cases:
             - Same claim window -> "click code" + "click fee" + "scroll"
             - Same calendar -> "click day 1" + "click day 15"
+
+            Distribution Example (in dataset.yaml):
+                task_distributions:
+                  example-click:
+                    normal: 0.80       # 80% normal cases
+                    edge_case: 0.15   # 15% edge cases
+                    adversarial: 0.05 # 5% no valid target
             """
 
             task_type = "example-click"
 
+            def __init__(self, config: dict | DatasetConfig, renderer: "BaseRenderer") -> None:
+                super().__init__(config, renderer)
+                # Store DatasetConfig for distribution sampling
+                self._dataset_config: DatasetConfig | None = None
+                if isinstance(config, DatasetConfig):
+                    self._dataset_config = config
+
+            def _get_distribution_type(self, ctx: TaskContext) -> str:
+                """Sample distribution type from config, with defaults."""
+                if self._dataset_config:
+                    dist_type = self._dataset_config.sample_distribution_type(
+                        self.task_type, ctx.rng
+                    )
+                    if dist_type:
+                        return dist_type
+                # Default distribution if not configured
+                roll = ctx.rng.random()
+                if roll < 0.80:
+                    return "normal"
+                elif roll < 0.95:
+                    return "edge_case"
+                else:
+                    return "adversarial"
+
             def generate_samples(self, ctx: TaskContext) -> list[TaskSample]:
                 """Generate MULTIPLE samples from ONE rendered image."""
-                # 1. Create state and render ONCE
+                # 1. Determine distribution type for this sample
+                dist_type = self._get_distribution_type(ctx)
+
+                # 2. Create state and render ONCE
                 state = {state_class}()
                 image, metadata = self.renderer.render(state)
                 image_path = self.save_image(image, ctx)
 
                 samples = []
 
-                # 2. Derive multiple samples from this one image
-                # IMPORTANT: Always normalize pixel coords before ToolCall!
+                # 3. Generate samples based on distribution type
+                if dist_type == "adversarial":
+                    # Adversarial: No valid target - model should respond with "answer"
+                    samples.append(TaskSample(
+                        id=self.build_id(ctx, "_adversarial"),
+                        image_path=image_path,
+                        human_prompt="Click the nonexistent item",
+                        tool_call=ToolCall(
+                            action="answer",
+                            text="There is no such item on the screen."
+                        ),
+                        pixel_coords=(0, 0),
+                        metadata={{
+                            "task_type": self.task_type,
+                            "distribution": dist_type,
+                            "has_match": False,
+                        }},
+                        image_size=image.size,
+                    ))
+                else:
+                    # Normal or edge_case: valid targets exist
+                    # IMPORTANT: Always normalize pixel coords before ToolCall!
+                    pixel_coords_1 = (400, 300)
+                    norm_coords_1 = normalize_coord(pixel_coords_1, image.size)
+                    samples.append(TaskSample(
+                        id=self.build_id(ctx, "_target1"),
+                        image_path=image_path,
+                        human_prompt="Click the first item",
+                        tool_call=ToolCall.left_click(norm_coords_1),  # NORMALIZED!
+                        pixel_coords=pixel_coords_1,
+                        metadata={{
+                            "task_type": self.task_type,
+                            "distribution": dist_type,
+                            "has_match": True,
+                            "target": "first",
+                        }},
+                        image_size=image.size,
+                    ))
 
-                # Sample 1: Click first target
-                pixel_coords_1 = (400, 300)
-                norm_coords_1 = normalize_coord(pixel_coords_1, image.size)
-                samples.append(TaskSample(
-                    id=self.build_id(ctx, "_target1"),
-                    image_path=image_path,
-                    human_prompt="Click the first item",
-                    tool_call=ToolCall.left_click(norm_coords_1),  # NORMALIZED!
-                    pixel_coords=pixel_coords_1,
-                    metadata={{"task_type": self.task_type, "target": "first"}},
-                    image_size=image.size,
-                ))
-
-                # Sample 2: Click second target (SAME IMAGE)
-                pixel_coords_2 = (500, 400)
-                norm_coords_2 = normalize_coord(pixel_coords_2, image.size)
-                samples.append(TaskSample(
-                    id=self.build_id(ctx, "_target2"),
-                    image_path=image_path,
-                    human_prompt="Click the second item",
-                    tool_call=ToolCall.left_click(norm_coords_2),  # NORMALIZED!
-                    pixel_coords=pixel_coords_2,
-                    metadata={{"task_type": self.task_type, "target": "second"}},
-                    image_size=image.size,
-                ))
+                    # For normal distribution, add more samples from same image
+                    if dist_type == "normal":
+                        pixel_coords_2 = (500, 400)
+                        norm_coords_2 = normalize_coord(pixel_coords_2, image.size)
+                        samples.append(TaskSample(
+                            id=self.build_id(ctx, "_target2"),
+                            image_path=image_path,
+                            human_prompt="Click the second item",
+                            tool_call=ToolCall.left_click(norm_coords_2),  # NORMALIZED!
+                            pixel_coords=pixel_coords_2,
+                            metadata={{
+                                "task_type": self.task_type,
+                                "distribution": dist_type,
+                                "has_match": True,
+                                "target": "second",
+                            }},
+                            image_size=image.size,
+                        ))
 
                 return samples
 
@@ -449,6 +518,15 @@ def _write_dataset_config(project_dir: Path, project_name: str) -> None:
         tasks:
           example-click: 100
 
+        # Task distributions - distribution of sample types within each task
+        # Each task can have its own distribution of subtypes.
+        # The values should sum to 1.0 (100%).
+        # task_distributions:
+        #   example-click:
+        #     normal: 0.80       # 80% normal cases
+        #     edge_case: 0.15   # 15% edge cases
+        #     adversarial: 0.05 # 5% adversarial (no match)
+
         # Train/test split
         splits:
           train: 0.8
@@ -465,6 +543,12 @@ def _write_dataset_config(project_dir: Path, project_name: str) -> None:
         test:
           count: 20
           tolerance: 10
+
+        # Annotation settings
+        annotation:
+          enabled: true
+          per_type:
+            example-click: 2
     """)
     (project_dir / "config" / "dataset.yaml").write_text(content)
 

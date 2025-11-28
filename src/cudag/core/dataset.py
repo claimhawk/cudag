@@ -71,11 +71,57 @@ class DatasetConfig:
     annotation_per_type: dict[str, int] = field(default_factory=dict)
     """Number of annotations per task type. Overrides annotation_ratio when set."""
 
+    task_distributions: dict[str, dict[str, float]] = field(default_factory=dict)
+    """Distribution of sample types within each task type.
+
+    Example:
+        task_distributions:
+          click-appointment:
+            grey_grey: 0.80      # 80% grey background + grey status
+            other_colors: 0.15  # 15% other color combos
+            adversarial: 0.05   # 5% no match cases
+          hover-appointment:
+            grey_grey: 0.80
+            other_colors: 0.15
+            adversarial: 0.05
+    """
+
     def __post_init__(self) -> None:
         """Set default output directory if not provided."""
         if self.output_dir is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             self.output_dir = Path("datasets") / f"{self.name_prefix}_{timestamp}"
+
+    def get_distribution(self, task_type: str) -> dict[str, float]:
+        """Get distribution for a task type.
+
+        Returns the task-specific distribution if defined, otherwise
+        returns an empty dict (task should use its own defaults).
+        """
+        return self.task_distributions.get(task_type, {})
+
+    def sample_distribution_type(self, task_type: str, rng: Any) -> str | None:
+        """Sample a distribution type for a task.
+
+        Args:
+            task_type: The task type to sample for.
+            rng: Random number generator.
+
+        Returns:
+            The sampled distribution type name, or None if no distribution defined.
+        """
+        dist = self.get_distribution(task_type)
+        if not dist:
+            return None
+
+        roll = rng.random()
+        cumulative = 0.0
+        for dist_type, prob in dist.items():
+            cumulative += prob
+            if roll < cumulative:
+                return dist_type
+        # Return last type if we somehow miss due to float precision
+        return list(dist.keys())[-1] if dist else None
 
     @classmethod
     def from_yaml(cls, path: Path) -> DatasetConfig:
@@ -101,6 +147,7 @@ class DatasetConfig:
             annotation_ratio=data.get("annotation", {}).get("ratio", 0.1),
             annotation_enabled=data.get("annotation", {}).get("enabled", True),
             annotation_per_type=data.get("annotation", {}).get("per_type", {}),
+            task_distributions=data.get("task_distributions", {}),
         )
 
 
@@ -407,6 +454,7 @@ class DatasetBuilder:
             "task_counts": self.config.task_counts,
             "train_split": self.config.train_split,
             "system_prompt": self.config.system_prompt,
+            "task_distributions": self.config.task_distributions,
             "generated_at": datetime.now().isoformat(),
         }
         with open(output_dir / "config.json", "w") as f:

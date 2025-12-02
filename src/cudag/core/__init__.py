@@ -129,10 +129,18 @@ from cudag.core.screen import (
     region,
     scrollable,
 )
+from cudag.core.drawing import render_scrollbar
 from cudag.core.fonts import SYSTEM_FONTS, load_font, load_font_family
 from cudag.core.generator import run_generator
+from cudag.core.random import amount, choose, date_in_range, weighted_choice
 from cudag.core.state import BaseState, ScrollState
 from cudag.core.task import BaseTask, TaskContext, TaskSample, TestCase
+from cudag.core.text import (
+    center_text_position,
+    draw_centered_text,
+    measure_text,
+    wrap_text,
+)
 from cudag.core.utils import check_script_invocation, get_researcher_name
 
 __all__ = [
@@ -281,4 +289,16 @@ __all__ = [
     "load_font",
     "load_font_family",
     "SYSTEM_FONTS",
+    # Random utilities
+    "choose",
+    "date_in_range",
+    "amount",
+    "weighted_choice",
+    # Text utilities
+    "measure_text",
+    "center_text_position",
+    "draw_centered_text",
+    "wrap_text",
+    # Drawing utilities
+    "render_scrollbar",
 ]

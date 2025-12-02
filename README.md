@@ -372,6 +372,73 @@ fonts = load_font_family(
 # fonts["regular"], fonts["bold"], fonts["italic"], fonts["bold_italic"]
 ```
 
+### Random Data Generation
+
+Use `choose()`, `date_in_range()`, and `amount()` for consistent random data:
+
+```python
+from random import Random
+from cudag import choose, date_in_range, amount, weighted_choice
+
+rng = Random(42)
+
+# Choose random item from sequence
+provider = choose(rng, ["Dr. Smith", "Dr. Jones", "Dr. Brown"])
+
+# Generate random date in range
+visit_date = date_in_range(rng, "2024-01-01", "2024-12-31", fmt="%m/%d/%Y")
+
+# Generate random monetary amount
+fee = amount(rng, 50.0, 500.0)
+# With optional zero values (20% chance)
+payment = amount(rng, 0.0, 100.0, allow_zero=True)
+
+# Weighted random choice
+status = weighted_choice(rng, {"pending": 0.7, "approved": 0.2, "denied": 0.1})
+```
+
+### Text Utilities
+
+Use text utilities for measurement and rendering:
+
+```python
+from cudag import measure_text, center_text_position, draw_centered_text, wrap_text
+from PIL import Image, ImageDraw, ImageFont
+
+font = ImageFont.load_default()
+
+# Measure text dimensions
+width, height = measure_text("Hello World", font)
+
+# Calculate centered position
+tx, ty = center_text_position("Label", font, x=0, y=0, width=200, height=50)
+
+# Draw centered text directly
+img = Image.new("RGB", (200, 100), "white")
+draw = ImageDraw.Draw(img)
+draw_centered_text(draw, "Centered", font, x=0, y=0, width=200, height=100)
+
+# Wrap text to fit width
+lines = wrap_text("This is a long sentence that needs wrapping", max_width=100, font=font)
+```
+
+### Drawing Utilities
+
+Use `render_scrollbar()` for scrollbar rendering:
+
+```python
+from cudag import render_scrollbar
+
+scrollbar = render_scrollbar(
+    content_height=1000,     # Total content height
+    visible_height=400,      # Visible viewport
+    scroll_offset=200,       # Current scroll position
+    width=12,                # Scrollbar width
+    min_thumb=30,            # Minimum thumb height
+)
+# Returns PIL Image of scrollbar
+```
+
 ## Coordinate System
 
 All coordinates use RU (Resolution Units) normalized to [0, 1000]:

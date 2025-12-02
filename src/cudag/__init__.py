@@ -52,6 +52,18 @@ from cudag.core import (
     load_font,
     load_font_family,
     SYSTEM_FONTS,
+    # Random utilities
+    choose,
+    date_in_range,
+    amount,
+    weighted_choice,
+    # Text utilities
+    measure_text,
+    center_text_position,
+    draw_centered_text,
+    wrap_text,
+    # Drawing utilities
+    render_scrollbar,
     BelongsToRel,
     BoolField,
     # Screen DSL - classes
@@ -271,4 +283,16 @@ __all__ = [
     "load_font",
     "load_font_family",
     "SYSTEM_FONTS",
+    # Random utilities
+    "choose",
+    "date_in_range",
+    "amount",
+    "weighted_choice",
+    # Text utilities
+    "measure_text",
+    "center_text_position",
+    "draw_centered_text",
+    "wrap_text",
+    # Drawing utilities
+    "render_scrollbar",
 ]

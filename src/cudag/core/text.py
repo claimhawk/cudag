@@ -144,3 +144,43 @@ def wrap_text(
         lines.append(" ".join(current_line))
 
     return lines if lines else [""]
+
+
+def truncate_text(
+    text: str,
+    max_width: int,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    ellipsis: str = "...",
+) -> str:
+    """Truncate text to fit within max_width pixels, adding ellipsis if needed.
+
+    Args:
+        text: Text string to truncate.
+        max_width: Maximum width in pixels.
+        font: PIL font to use for measurement.
+        ellipsis: String to append when truncating. Default "...".
+
+    Returns:
+        Original text if it fits, otherwise truncated text with ellipsis.
+
+    Example:
+        >>> font = ImageFont.load_default()
+        >>> truncate_text("This is a very long text", 50, font)
+        'This is...'
+    """
+    if not text:
+        return text
+
+    text_width, _ = measure_text(text, font)
+    if text_width <= max_width:
+        return text
+
+    # Binary search would be faster, but linear is simpler and text is usually short
+    for i in range(len(text), 0, -1):
+        truncated = text[:i] + ellipsis
+        truncated_width, _ = measure_text(truncated, font)
+        if truncated_width <= max_width:
+            return truncated
+
+    # If even ellipsis doesn't fit, return empty
+    return ""

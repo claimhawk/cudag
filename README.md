@@ -420,6 +420,25 @@ draw_centered_text(draw, "Centered", font, x=0, y=0, width=200, height=100)
 
 # Wrap text to fit width
 lines = wrap_text("This is a long sentence that needs wrapping", max_width=100, font=font)
+
+# Truncate text with ellipsis
+short = truncate_text("This is a very long label", max_width=80, font=font)
+# Returns "This is..." or similar
+```
+
+### Config Utilities
+
+Load YAML configuration files:
+
+```python
+from cudag import load_yaml_config, get_config_path
+
+# Get config path relative to your module
+config_path = get_config_path(__file__, "canvas.yaml")
+
+# Load YAML config
+config = load_yaml_config(config_path)
+# Returns dict with parsed YAML content
 ```
 
 ### Drawing Utilities

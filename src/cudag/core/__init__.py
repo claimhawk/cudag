@@ -129,6 +129,7 @@ from cudag.core.screen import (
     region,
     scrollable,
 )
+from cudag.core.config import get_config_path, load_yaml_config
 from cudag.core.drawing import render_scrollbar
 from cudag.core.fonts import SYSTEM_FONTS, load_font, load_font_family
 from cudag.core.generator import run_generator
@@ -139,6 +140,7 @@ from cudag.core.text import (
     center_text_position,
     draw_centered_text,
     measure_text,
+    truncate_text,
     wrap_text,
 )
 from cudag.core.utils import check_script_invocation, get_researcher_name
@@ -299,6 +301,10 @@ __all__ = [
     "center_text_position",
     "draw_centered_text",
     "wrap_text",
+    "truncate_text",
     # Drawing utilities
     "render_scrollbar",
+    # Config utilities
+    "load_yaml_config",
+    "get_config_path",
 ]

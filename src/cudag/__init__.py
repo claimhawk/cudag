@@ -62,8 +62,12 @@ from cudag.core import (
     center_text_position,
     draw_centered_text,
     wrap_text,
+    truncate_text,
     # Drawing utilities
     render_scrollbar,
+    # Config utilities
+    load_yaml_config,
+    get_config_path,
     BelongsToRel,
     BoolField,
     # Screen DSL - classes
@@ -293,6 +297,10 @@ __all__ = [
     "center_text_position",
     "draw_centered_text",
     "wrap_text",
+    "truncate_text",
     # Drawing utilities
     "render_scrollbar",
+    # Config utilities
+    "load_yaml_config",
+    "get_config_path",
 ]

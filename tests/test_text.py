@@ -10,6 +10,7 @@ from cudag import (
     center_text_position,
     draw_centered_text,
     measure_text,
+    truncate_text,
     wrap_text,
 )
 
@@ -114,3 +115,41 @@ class TestWrapText:
         assert "three" in rejoined
         assert "four" in rejoined
         assert "five" in rejoined
+
+
+class TestTruncateText:
+    """Tests for truncate_text function."""
+
+    def test_truncate_text_short(self) -> None:
+        """Short text should not be truncated."""
+        font = ImageFont.load_default()
+        result = truncate_text("Hi", 1000, font)
+        assert result == "Hi"
+
+    def test_truncate_text_long(self) -> None:
+        """Long text should be truncated with ellipsis."""
+        font = ImageFont.load_default()
+        result = truncate_text("This is a very long text that needs truncating", 50, font)
+        assert result.endswith("...")
+        assert len(result) < len("This is a very long text that needs truncating")
+
+    def test_truncate_text_empty(self) -> None:
+        """Empty text should return empty."""
+        font = ImageFont.load_default()
+        result = truncate_text("", 100, font)
+        assert result == ""
+
+    def test_truncate_text_custom_ellipsis(self) -> None:
+        """Should use custom ellipsis."""
+        font = ImageFont.load_default()
+        result = truncate_text("This is a very long text", 50, font, ellipsis="~")
+        assert result.endswith("~")
+        assert "..." not in result
+
+    def test_truncate_text_fits_exactly(self) -> None:
+        """Text that fits should not be modified."""
+        font = ImageFont.load_default()
+        text = "Hi"
+        width, _ = measure_text(text, font)
+        result = truncate_text(text, width, font)
+        assert result == text

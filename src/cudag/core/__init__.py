@@ -129,9 +129,11 @@ from cudag.core.screen import (
     region,
     scrollable,
 )
+from cudag.core.fonts import SYSTEM_FONTS, load_font, load_font_family
+from cudag.core.generator import run_generator
 from cudag.core.state import BaseState, ScrollState
 from cudag.core.task import BaseTask, TaskContext, TaskSample, TestCase
-from cudag.core.utils import check_script_invocation
+from cudag.core.utils import check_script_invocation, get_researcher_name
 
 __all__ = [
     # Coordinates
@@ -272,4 +274,11 @@ __all__ = [
     "Fee",
     # Utils
     "check_script_invocation",
+    "get_researcher_name",
+    # Generator
+    "run_generator",
+    # Fonts
+    "load_font",
+    "load_font_family",
+    "SYSTEM_FONTS",
 ]

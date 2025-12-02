@@ -8,6 +8,49 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
+
+
+def get_researcher_name(fallback_to_env: bool = True) -> str | None:
+    """Get researcher name from .researcher file.
+
+    Supports formats:
+    - "Name: mike" (key-value)
+    - "mike" (plain text)
+
+    The file is searched for in the current working directory.
+
+    Args:
+        fallback_to_env: If True, fall back to USER env var when file missing
+            or empty. Defaults to True.
+
+    Returns:
+        Researcher name (lowercased) or None if not found.
+
+    Example:
+        >>> # With .researcher file containing "Name: mike"
+        >>> get_researcher_name()
+        'mike'
+        >>> # Without .researcher file
+        >>> get_researcher_name(fallback_to_env=False)
+        None
+    """
+    researcher_file = Path(".researcher")
+    if researcher_file.exists():
+        content = researcher_file.read_text().strip()
+        for line in content.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            # Handle "Name: mike" format
+            if ":" in line:
+                return line.split(":", 1)[1].strip().lower()
+            # Handle plain "mike" format
+            return line.lower()
+    if fallback_to_env:
+        user = os.environ.get("USER")
+        return user.lower() if user else None
+    return None
 
 
 def check_script_invocation() -> None:

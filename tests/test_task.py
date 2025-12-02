@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cudag.core.task import BaseTask, EvalCase, TaskContext, TaskSample
+from cudag.core.task import BaseTask, TestCase, TaskContext, TaskSample
 from cudag.prompts.tools import ToolCall
 
 
@@ -63,39 +63,39 @@ class TestTaskSample:
         assert sample.metadata["target_date"] == "2025-01-15"
 
 
-class TestEvalCase:
-    """Tests for EvalCase dataclass."""
+class TestTestCase:
+    """Tests for TestCase dataclass."""
 
     def test_creation(self) -> None:
-        eval_case = EvalCase(
-            eval_id="eval_001",
-            screenshot=Path("/tmp/eval.png"),
+        test_case = TestCase(
+            test_id="test_001",
+            screenshot=Path("/tmp/test.png"),
             prompt="Click the submit button",
             expected_action={"name": "computer_use", "arguments": {"action": "left_click"}},
             tolerance=10,
         )
-        assert eval_case.eval_id == "eval_001"
-        assert eval_case.tolerance == 10
+        assert test_case.test_id == "test_001"
+        assert test_case.tolerance == 10
 
     def test_default_metadata(self) -> None:
-        eval_case = EvalCase(
-            eval_id="eval",
-            screenshot=Path("/tmp/eval.png"),
+        test_case = TestCase(
+            test_id="test",
+            screenshot=Path("/tmp/test.png"),
             prompt="Test",
             expected_action={},
             tolerance=5,
         )
-        assert eval_case.metadata == {}
+        assert test_case.metadata == {}
 
     def test_pixel_coords_optional(self) -> None:
-        eval_case = EvalCase(
-            eval_id="eval",
-            screenshot=Path("/tmp/eval.png"),
+        test_case = TestCase(
+            test_id="test",
+            screenshot=Path("/tmp/test.png"),
             prompt="Test",
             expected_action={},
             tolerance=5,
         )
-        assert eval_case.pixel_coords is None
+        assert test_case.pixel_coords is None
 
 
 class TestTaskContext:
@@ -155,10 +155,10 @@ class TestBaseTask:
                     pixel_coords=(500, 300),
                 )
 
-            def generate_eval(self, ctx: TaskContext) -> EvalCase:
-                return EvalCase(
-                    eval_id=f"eval_{ctx.index}",
-                    screenshot=Path("/tmp/eval.png"),
+            def generate_test(self, ctx: TaskContext) -> TestCase:
+                return TestCase(
+                    test_id=f"test_{ctx.index}",
+                    screenshot=Path("/tmp/test.png"),
                     prompt="Test",
                     expected_action={},
                     tolerance=10,
@@ -183,10 +183,10 @@ class TestBaseTask:
                     pixel_coords=(0, 0),
                 )
 
-            def generate_eval(self, ctx: TaskContext) -> EvalCase:
-                return EvalCase(
-                    eval_id="eval",
-                    screenshot=Path("/tmp/eval.png"),
+            def generate_test(self, ctx: TaskContext) -> TestCase:
+                return TestCase(
+                    test_id="test",
+                    screenshot=Path("/tmp/test.png"),
                     prompt="Test",
                     expected_action={},
                     tolerance=10,
@@ -221,10 +221,10 @@ class TestBaseTask:
                     pixel_coords=(0, 0),
                 )
 
-            def generate_eval(self, ctx: TaskContext) -> EvalCase:
-                return EvalCase(
-                    eval_id="eval",
-                    screenshot=Path("/tmp/eval.png"),
+            def generate_test(self, ctx: TaskContext) -> TestCase:
+                return TestCase(
+                    test_id="test",
+                    screenshot=Path("/tmp/test.png"),
                     prompt="Test",
                     expected_action={},
                     tolerance=10,
@@ -242,7 +242,7 @@ class TestBaseTask:
 
             path = task.save_image(mock_image, ctx)
             assert (Path(tmpdir) / "images").is_dir()
-            assert path.suffix == ".png"
+            assert path.suffix == ".jpg"  # Default extension is jpg
             mock_image.save.assert_called_once()
 
     def test_save_image_jpg(self) -> None:
@@ -261,10 +261,10 @@ class TestBaseTask:
                     pixel_coords=(0, 0),
                 )
 
-            def generate_eval(self, ctx: TaskContext) -> EvalCase:
-                return EvalCase(
-                    eval_id="eval",
-                    screenshot=Path("/tmp/eval.png"),
+            def generate_test(self, ctx: TaskContext) -> TestCase:
+                return TestCase(
+                    test_id="test",
+                    screenshot=Path("/tmp/test.png"),
                     prompt="Test",
                     expected_action={},
                     tolerance=10,
@@ -300,10 +300,10 @@ class TestBaseTask:
                     pixel_coords=(0, 0),
                 )
 
-            def generate_eval(self, ctx: TaskContext) -> EvalCase:
-                return EvalCase(
-                    eval_id="eval",
-                    screenshot=Path("/tmp/eval.png"),
+            def generate_test(self, ctx: TaskContext) -> TestCase:
+                return TestCase(
+                    test_id="test",
+                    screenshot=Path("/tmp/test.png"),
                     prompt="Test",
                     expected_action={},
                     tolerance=10,

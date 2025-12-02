@@ -45,6 +45,13 @@ from cudag.core import (
     BaseTask,
     # Utils
     check_script_invocation,
+    get_researcher_name,
+    # Generator
+    run_generator,
+    # Fonts
+    load_font,
+    load_font_family,
+    SYSTEM_FONTS,
     BelongsToRel,
     BoolField,
     # Screen DSL - classes
@@ -257,4 +264,11 @@ __all__ = [
     "get_system_prompt",
     # Utils
     "check_script_invocation",
+    "get_researcher_name",
+    # Generator
+    "run_generator",
+    # Fonts
+    "load_font",
+    "load_font_family",
+    "SYSTEM_FONTS",
 ]

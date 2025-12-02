@@ -259,34 +259,40 @@ class ScrollGridTask(BaseTask):
 
 ### Step 9: Create Dataset Generator
 
-Wire everything together:
+Use `run_generator()` to handle boilerplate (argument parsing, config loading, dataset naming):
 
 ```python
 from pathlib import Path
-import yaml
-from cudag import DatasetBuilder, DatasetConfig
+from cudag import run_generator
 from .renderer import ClaimWindowRenderer
 from .tasks import ScrollGridTask
 
 def main():
-    with open("config/dataset.yaml") as f:
-        config = yaml.safe_load(f)
-
-    dataset_config = DatasetConfig(
-        name_prefix=config["name_prefix"],
-        seed=config["seed"],
-        task_counts=config["tasks"],
-        train_split=config["train_split"],
-    )
-
-    renderer = ClaimWindowRenderer(Path("assets"))
-    tasks = [ScrollGridTask(config.get("task_config", {}), renderer)]
-
-    builder = DatasetBuilder(config=dataset_config, tasks=tasks)
-    builder.build()
+    renderer = ClaimWindowRenderer(assets_dir=Path("assets"))
+    tasks = [ScrollGridTask(config={}, renderer=renderer)]
+    run_generator(renderer, tasks)
 
 if __name__ == "__main__":
     main()
+```
+
+The `run_generator()` helper handles:
+- Script invocation check
+- Argument parsing (`--config`, `--seed`)
+- Config loading from YAML
+- Dataset naming (`{prefix}-{researcher}-{timestamp}`)
+- Building dataset and tests
+
+For custom behavior, use optional parameters:
+
+```python
+run_generator(
+    renderer,
+    tasks,
+    extra_args=[("--debug", {"action": "store_true"})],
+    config_modifier=lambda config, args: setattr(config, 'seed', 999) if args.debug else None,
+    post_build=lambda output_dir, renderer: generate_debug_images(output_dir),
+)
 ```
 
 ### Step 10: Generate Production Dataset
@@ -321,6 +327,49 @@ Generated JSONL structure:
     "real_coords": [577, 300]
   }
 }
+```
+
+## Utility Functions
+
+### Researcher Name
+
+Use `get_researcher_name()` to automatically include researcher identity in dataset names:
+
+```python
+from cudag import get_researcher_name
+
+# Reads from .researcher file (supports "Name: mike" or plain "mike")
+# Falls back to USER environment variable
+researcher = get_researcher_name()  # Returns "mike" or None
+
+# Disable environment fallback
+researcher = get_researcher_name(fallback_to_env=False)
+```
+
+### Font Loading
+
+Use `load_font()` for platform-aware font loading with automatic fallbacks:
+
+```python
+from cudag import load_font, load_font_family
+
+# Load with automatic system font fallback
+font = load_font("assets/fonts/Inter.ttf", size=14)
+
+# Load with explicit fallbacks
+font = load_font(
+    "assets/fonts/Inter.ttf",
+    size=14,
+    fallbacks=["/System/Library/Fonts/Helvetica.ttc"]
+)
+
+# Load font family with variants
+fonts = load_font_family(
+    "fonts/Inter-Regular.ttf",
+    size=14,
+    bold="fonts/Inter-Bold.ttf",
+)
+# fonts["regular"], fonts["bold"], fonts["italic"], fonts["bold_italic"]
 ```
 
 ## Coordinate System

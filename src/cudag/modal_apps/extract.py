@@ -13,6 +13,19 @@ import sys
 
 import modal
 
+# =============================================================================
+# CENTRALIZED CONFIGURATION
+# =============================================================================
+# Volume names are loaded from config/adapters.yaml via the SDK.
+# Users can customize these by editing the YAML file.
+
+try:
+    from sdk.modal_compat import get_volume_name
+    DEFAULT_VOLUME = get_volume_name("lora_training")
+except ImportError:
+    # Fallback when SDK not available
+    DEFAULT_VOLUME = "claimhawk-lora-training"
+
 
 def _get_generator_name() -> str:
     """Extract generator name from --dataset-name arg for dynamic app naming."""
@@ -23,7 +36,6 @@ def _get_generator_name() -> str:
     return "cudag"
 
 
-DEFAULT_VOLUME = "claimhawk-lora-training"
 app = modal.App(f"{_get_generator_name()}-extract")
 VOLUME = modal.Volume.from_name(DEFAULT_VOLUME, create_if_missing=True)
 

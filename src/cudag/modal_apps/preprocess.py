@@ -75,6 +75,21 @@ from pathlib import Path
 
 import modal
 
+# =============================================================================
+# CENTRALIZED CONFIGURATION
+# =============================================================================
+# Volume names and model info are loaded from config/adapters.yaml via the SDK.
+# Users can customize these by editing the YAML file.
+
+try:
+    from sdk.modal_compat import get_volume_name, get_base_vlm
+    DEFAULT_VOLUME = get_volume_name("lora_training")
+    BASE_MODEL = get_base_vlm()
+except ImportError:
+    # Fallback when SDK not available
+    DEFAULT_VOLUME = "claimhawk-lora-training"
+    BASE_MODEL = "Qwen/Qwen3-VL-8B-Instruct"
+
 
 def _get_generator_name() -> str:
     """Extract generator name from --dataset-name arg for dynamic app naming."""
@@ -90,7 +105,6 @@ def _get_generator_name() -> str:
 app = modal.App(f"{_get_generator_name()}-preprocess")
 
 # Volume - matches modal-volumes.md structure
-DEFAULT_VOLUME = "claimhawk-lora-training"
 VOLUME = modal.Volume.from_name(DEFAULT_VOLUME, create_if_missing=True)
 
 # Docker Image with Dependencies (CPU-only, no GPU needed)
@@ -205,7 +219,7 @@ def preprocess_dataset_impl(dataset_name: str):
     print("Loading Processor")
     print(f"{'='*80}\n")
 
-    model_name = "Qwen/Qwen3-VL-8B-Instruct"
+    model_name = BASE_MODEL
     print(f"Loading processor: {model_name}")
     processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
     print("Processor loaded")

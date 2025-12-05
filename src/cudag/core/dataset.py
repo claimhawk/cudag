@@ -448,9 +448,13 @@ class DatasetBuilder:
 
     def _write_config(self, output_dir: Path) -> None:
         """Write generation config for reference."""
+        # Extract task_types from task_counts keys
+        task_types = list(self.config.task_counts.keys())
+
         config_data = {
             "name_prefix": self.config.name_prefix,
             "seed": self.config.seed,
+            "task_types": task_types,
             "task_counts": self.config.task_counts,
             "train_split": self.config.train_split,
             "system_prompt": self.config.system_prompt,

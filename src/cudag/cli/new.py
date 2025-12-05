@@ -313,18 +313,27 @@ def _write_generator(project_dir: Path, module_name: str) -> None:
                 default=Path("config/dataset.yaml"),
                 help="Path to dataset config YAML",
             )
+            parser.add_argument(
+                "--exp",
+                type=str,
+                default=None,
+                help="Experiment label to include in dataset name",
+            )
             args = parser.parse_args()
 
             # Load config
             config = DatasetConfig.from_yaml(args.config)
 
-            # Build dataset name with timestamp
+            # Build dataset name: name--researcher--exp--timestamp
             researcher = get_researcher_name()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            name_parts = [config.name_prefix]
             if researcher:
-                dataset_name = f"{{config.name_prefix}}--{{researcher}}--{{timestamp}}"
-            else:
-                dataset_name = f"{{config.name_prefix}}_{{timestamp}}"
+                name_parts.append(researcher)
+            if args.exp:
+                name_parts.append(args.exp)
+            name_parts.append(timestamp)
+            dataset_name = "--".join(name_parts)
 
             # Override output_dir with new naming
             config.output_dir = Path("datasets") / dataset_name

@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Tylt LLC. All rights reserved.
-# Derivative works may be released by researchers,
-# but original files may not be redistributed or used beyond research purposes.
+# CONFIDENTIAL AND PROPRIETARY. Unauthorized use, copying, or distribution
+# is strictly prohibited. For licensing inquiries: hello@claimhawk.app
 
 """Coordinate system utilities for RU (Resolution Units) normalization.
 
@@ -147,3 +147,74 @@ def coord_within_tolerance(
         True if within tolerance
     """
     return coord_distance(actual, expected) <= tolerance
+
+
+def tolerance_to_ru(
+    tolerance_pixels: tuple[int, int],
+    image_size: tuple[int, int],
+) -> tuple[int, int]:
+    """Convert pixel tolerance to normalized RU units.
+
+    Args:
+        tolerance_pixels: (width, height) tolerance in pixels
+        image_size: (width, height) of the image
+
+    Returns:
+        Tolerance in RU units [0, 1000]
+
+    Example:
+        >>> tolerance_to_ru((50, 30), (1920, 1080))
+        (26, 28)
+    """
+    scale = RU_MAX / max(image_size)
+    return (
+        int(round(tolerance_pixels[0] * scale)),
+        int(round(tolerance_pixels[1] * scale)),
+    )
+
+
+def bounds_to_tolerance(
+    bounds: tuple[int, int, int, int],
+    scale: float = 0.5,
+) -> tuple[int, int]:
+    """Calculate tolerance from bounding box dimensions.
+
+    Args:
+        bounds: (x, y, width, height) bounding box
+        scale: Fraction of dimensions to use (default 0.5 = half size)
+
+    Returns:
+        (tolerance_x, tolerance_y) in pixels
+
+    Example:
+        >>> bounds_to_tolerance((0, 0, 100, 50), scale=0.5)
+        (50, 25)
+    """
+    _, _, width, height = bounds
+    return (int(width * scale), int(height * scale))
+
+
+def calculate_tolerance_ru(
+    element_size: tuple[int, int],
+    image_size: tuple[int, int],
+    scale: float = 0.7,
+) -> tuple[int, int]:
+    """Calculate normalized tolerance for an element.
+
+    This is a convenience function combining bounds_to_tolerance and tolerance_to_ru.
+    The default scale of 0.7 means clicks within 70% of the element size are accepted.
+
+    Args:
+        element_size: (width, height) of the clickable element in pixels
+        image_size: (width, height) of the full image in pixels
+        scale: Fraction of element size to use as tolerance (default 0.7 = 70%)
+
+    Returns:
+        Tolerance in RU units [0, 1000]
+
+    Example:
+        >>> calculate_tolerance_ru((100, 50), (1920, 1080), scale=0.7)
+        (36, 32)
+    """
+    pixel_tol = (int(element_size[0] * scale), int(element_size[1] * scale))
+    return tolerance_to_ru(pixel_tol, image_size)

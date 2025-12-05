@@ -1,17 +1,20 @@
 # Copyright (c) 2025 Tylt LLC. All rights reserved.
-# Derivative works may be released by researchers,
-# but original files may not be redistributed or used beyond research purposes.
+# CONFIDENTIAL AND PROPRIETARY. Unauthorized use, copying, or distribution
+# is strictly prohibited. For licensing inquiries: hello@claimhawk.app
 
 """Core framework classes and DSL functions."""
 
 from cudag.core.coords import (
     RU_MAX,
+    bounds_to_tolerance,
+    calculate_tolerance_ru,
     clamp_coord,
     coord_distance,
     coord_within_tolerance,
     get_normalized_bounds,
     normalize_coord,
     pixel_from_normalized,
+    tolerance_to_ru,
 )
 from cudag.core.button import (
     DIALOG_CANCEL,
@@ -48,6 +51,8 @@ from cudag.core.icon import (
     IconSpec,
 )
 from cudag.core.dataset import DatasetBuilder, DatasetConfig
+from cudag.core.distribution import DistributionSampler
+from cudag.core.scroll_task import ScrollTaskBase, ScrollTaskConfig
 from cudag.core.models import (
     # Classes
     Attachment,
@@ -140,6 +145,7 @@ from cudag.core.text import (
     center_text_position,
     draw_centered_text,
     measure_text,
+    ordinal_suffix,
     truncate_text,
     wrap_text,
 )
@@ -154,6 +160,9 @@ __all__ = [
     "clamp_coord",
     "coord_distance",
     "coord_within_tolerance",
+    "tolerance_to_ru",
+    "bounds_to_tolerance",
+    "calculate_tolerance_ru",
     # Screen DSL - classes
     "Screen",
     "ScreenBase",
@@ -220,6 +229,11 @@ __all__ = [
     # Dataset
     "DatasetBuilder",
     "DatasetConfig",
+    # Distribution
+    "DistributionSampler",
+    # Scroll Tasks
+    "ScrollTaskBase",
+    "ScrollTaskConfig",
     # Model DSL - classes
     "Model",
     "ModelGenerator",
@@ -302,6 +316,7 @@ __all__ = [
     "draw_centered_text",
     "wrap_text",
     "truncate_text",
+    "ordinal_suffix",
     # Drawing utilities
     "render_scrollbar",
     # Config utilities

@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Tylt LLC. All rights reserved.
-# Derivative works may be released by researchers,
-# but original files may not be redistributed or used beyond research purposes.
+# CONFIDENTIAL AND PROPRIETARY. Unauthorized use, copying, or distribution
+# is strictly prohibited. For licensing inquiries: hello@claimhawk.app
 
 """Main CLI entrypoint for CUDAG."""
 
@@ -159,6 +159,126 @@ def datasets() -> None:
     """List datasets on Modal volume."""
     click.echo("Listing datasets on Modal volume...")
     click.echo("Dataset listing not yet implemented")
+
+
+@cli.command()
+@click.option(
+    "--host",
+    "-h",
+    default="127.0.0.1",
+    help="Host to bind to (default: 127.0.0.1)",
+)
+@click.option(
+    "--port",
+    "-p",
+    default=8420,
+    help="Port to listen on (default: 8420)",
+)
+@click.option(
+    "--reload",
+    is_flag=True,
+    help="Enable auto-reload for development",
+)
+def serve(host: str, port: int, reload: bool) -> None:
+    """Start the CUDAG server for annotation integration.
+
+    The server provides a REST API that the Annotator UI can use
+    to generate CUDAG projects without using the terminal.
+
+    Endpoints:
+      GET  /health           - Health check
+      POST /api/v1/generate  - Generate project from annotation
+      GET  /api/v1/status/{job_id} - Check generation progress
+    """
+    from cudag.server import run_server
+
+    click.echo(f"Starting CUDAG server on http://{host}:{port}")
+    click.echo("Press Ctrl+C to stop")
+    run_server(host=host, port=port, reload=reload)
+
+
+@cli.command("from-annotation")
+@click.argument("annotation_path", type=click.Path(exists=True))
+@click.option(
+    "--output-dir",
+    "-o",
+    type=click.Path(),
+    default=".",
+    help="Directory to create the project in (default: current directory)",
+)
+@click.option(
+    "--name",
+    "-n",
+    help="Project name (default: derived from annotation)",
+)
+def from_annotation(annotation_path: str, output_dir: str, name: str | None) -> None:
+    """Create a CUDAG project from an annotation ZIP.
+
+    ANNOTATION_PATH is the path to an annotation.zip file exported
+    from the Annotator application.
+
+    This generates a complete project structure with:
+    - screen.py: Screen definition with regions
+    - state.py: State class for dynamic content
+    - renderer.py: Renderer using the masked image
+    - tasks/: Task files for each defined task
+    - config/: Dataset configuration
+    - assets/: Base images and icons
+    """
+    import zipfile
+    from cudag.annotation import AnnotationLoader, scaffold_generator
+
+    loader = AnnotationLoader()
+
+    # Load annotation
+    annotation_file = Path(annotation_path)
+    if not annotation_file.suffix == ".zip":
+        click.secho("Error: Expected a .zip file", fg="red")
+        raise SystemExit(1)
+
+    try:
+        parsed = loader.load(annotation_file)
+    except Exception as e:
+        click.secho(f"Error loading annotation: {e}", fg="red")
+        raise SystemExit(1)
+
+    project_name = name or parsed.screen_name
+
+    # Extract images from ZIP
+    with zipfile.ZipFile(annotation_file) as zf:
+        original_bytes = zf.read("original.png") if "original.png" in zf.namelist() else None
+        masked_bytes = zf.read("masked.png") if "masked.png" in zf.namelist() else None
+
+        # Extract icons
+        icons: dict[str, bytes] = {}
+        for filename in zf.namelist():
+            if filename.startswith("icons/") and filename.endswith(".png"):
+                icon_name = Path(filename).stem
+                icons[icon_name] = zf.read(filename)
+
+    # Scaffold project
+    output_path = Path(output_dir)
+    files = scaffold_generator(
+        name=project_name,
+        annotation=parsed,
+        output_dir=output_path,
+        original_image=original_bytes,
+        masked_image=masked_bytes,
+        icons=icons,
+    )
+
+    project_dir = output_path / project_name
+    click.secho(f"Created project: {project_dir}", fg="green")
+    click.echo(f"\nGenerated {len(files)} files:")
+    for f in files[:10]:
+        click.echo(f"  {f.relative_to(project_dir)}")
+    if len(files) > 10:
+        click.echo(f"  ... and {len(files) - 10} more")
+
+    click.echo("\nNext steps:")
+    click.echo(f"  cd {project_dir}")
+    click.echo("  # Review and customize generated code")
+    click.echo("  python generator.py --samples 100")
 
 
 if __name__ == "__main__":

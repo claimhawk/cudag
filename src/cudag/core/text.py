@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Tylt LLC. All rights reserved.
-# Derivative works may be released by researchers,
-# but original files may not be redistributed or used beyond research purposes.
+# CONFIDENTIAL AND PROPRIETARY. Unauthorized use, copying, or distribution
+# is strictly prohibited. For licensing inquiries: hello@claimhawk.app
 
 """Text measurement and rendering utilities for CUDAG framework."""
 
@@ -184,3 +184,29 @@ def truncate_text(
 
     # If even ellipsis doesn't fit, return empty
     return ""
+
+
+def ordinal_suffix(day: int) -> str:
+    """Return the ordinal suffix for a day number.
+
+    Args:
+        day: Day of month (1-31)
+
+    Returns:
+        Ordinal suffix ("st", "nd", "rd", or "th")
+
+    Examples:
+        >>> ordinal_suffix(1)
+        'st'
+        >>> ordinal_suffix(2)
+        'nd'
+        >>> ordinal_suffix(3)
+        'rd'
+        >>> ordinal_suffix(11)
+        'th'
+        >>> ordinal_suffix(21)
+        'st'
+    """
+    if 11 <= day <= 13:
+        return "th"
+    return {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")

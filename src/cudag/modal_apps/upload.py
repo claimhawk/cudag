@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2025 Tylt LLC. All rights reserved.
-# Derivative works may be released by researchers,
-# but original files may not be redistributed or used beyond research purposes.
+# CONFIDENTIAL AND PROPRIETARY. Unauthorized use, copying, or distribution
+# is strictly prohibited. For licensing inquiries: hello@claimhawk.app
 
 """Compress a dataset run into chunks and upload to Modal with resume support.
 

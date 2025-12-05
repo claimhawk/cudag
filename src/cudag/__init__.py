@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Tylt LLC. All rights reserved.
-# Derivative works may be released by researchers,
-# but original files may not be redistributed or used beyond research purposes.
+# CONFIDENTIAL AND PROPRIETARY. Unauthorized use, copying, or distribution
+# is strictly prohibited. For licensing inquiries: hello@claimhawk.app
 
 """CUDAG - ComputerUseDataAugmentedGeneration framework.
 
@@ -35,6 +35,9 @@ __version__ = "0.1.0"
 from cudag.core import (
     # Coordinates
     RU_MAX,
+    bounds_to_tolerance,
+    calculate_tolerance_ru,
+    tolerance_to_ru,
     # Model DSL - classes
     Attachment,
     # Renderer
@@ -63,6 +66,7 @@ from cudag.core import (
     draw_centered_text,
     wrap_text,
     truncate_text,
+    ordinal_suffix,
     # Drawing utilities
     render_scrollbar,
     # Config utilities
@@ -80,6 +84,11 @@ from cudag.core import (
     # Dataset
     DatasetBuilder,
     DatasetConfig,
+    # Distribution
+    DistributionSampler,
+    # Scroll Tasks
+    ScrollTaskBase,
+    ScrollTaskConfig,
     DateField,
     DropdownRegion,
     TestCase,
@@ -178,6 +187,9 @@ __all__ = [
     "clamp_coord",
     "coord_distance",
     "coord_within_tolerance",
+    "tolerance_to_ru",
+    "bounds_to_tolerance",
+    "calculate_tolerance_ru",
     # Screen DSL - classes
     "Screen",
     "ScreenBase",
@@ -208,6 +220,11 @@ __all__ = [
     # Dataset
     "DatasetBuilder",
     "DatasetConfig",
+    # Distribution
+    "DistributionSampler",
+    # Scroll Tasks
+    "ScrollTaskBase",
+    "ScrollTaskConfig",
     # Model DSL - classes
     "Model",
     "ModelGenerator",
@@ -298,6 +315,7 @@ __all__ = [
     "draw_centered_text",
     "wrap_text",
     "truncate_text",
+    "ordinal_suffix",
     # Drawing utilities
     "render_scrollbar",
     # Config utilities

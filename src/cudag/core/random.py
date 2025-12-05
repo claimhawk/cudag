@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Tylt LLC. All rights reserved.
-# Derivative works may be released by researchers,
-# but original files may not be redistributed or used beyond research purposes.
+# CONFIDENTIAL AND PROPRIETARY. Unauthorized use, copying, or distribution
+# is strictly prohibited. For licensing inquiries: hello@claimhawk.app
 
 """Random data generation utilities for CUDAG framework."""
 
@@ -8,18 +8,23 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from random import Random
-from typing import Any, Sequence
+from typing import Any, Sequence, TypeVar
+
+T = TypeVar("T")
 
 
-def choose(rng: Random, values: Sequence[Any]) -> Any:
+def choose(rng: Random, values: Sequence[T]) -> T:
     """Choose a random item from a sequence.
 
     Args:
         rng: Random number generator.
-        values: Sequence of values to choose from.
+        values: Non-empty sequence of values to choose from.
 
     Returns:
-        A randomly selected item, or empty string if sequence is empty.
+        A randomly selected item.
+
+    Raises:
+        ValueError: If values is empty.
 
     Example:
         >>> rng = Random(42)
@@ -27,7 +32,7 @@ def choose(rng: Random, values: Sequence[Any]) -> Any:
         'cherry'
     """
     if not values:
-        return ""
+        raise ValueError("Cannot choose from empty sequence")
     return values[rng.randint(0, len(values) - 1)]
 
 

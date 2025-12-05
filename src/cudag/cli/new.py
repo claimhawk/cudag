@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Tylt LLC. All rights reserved.
-# Derivative works may be released by researchers,
-# but original files may not be redistributed or used beyond research purposes.
+# CONFIDENTIAL AND PROPRIETARY. Unauthorized use, copying, or distribution
+# is strictly prohibited. For licensing inquiries: hello@claimhawk.app
 
 """Project scaffolding for cudag new command."""
 
@@ -127,8 +127,7 @@ def _write_screen(project_dir: Path, module_name: str) -> None:
     renderer_name = class_name.replace("Screen", "Renderer")
 
     content = dedent(f'''\
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
+                # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
         """Screen definition for {module_name}."""
@@ -182,8 +181,7 @@ def _write_state(project_dir: Path, module_name: str) -> None:
     class_name = "".join(word.title() for word in module_name.split("_")) + "State"
 
     content = dedent(f'''\
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
+                # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
         """State definition for {module_name}."""
@@ -215,8 +213,7 @@ def _write_renderer(project_dir: Path, module_name: str) -> None:
     renderer_class = "".join(word.title() for word in module_name.split("_")) + "Renderer"
 
     content = dedent(f'''\
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
+                # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
         """Renderer for {module_name}."""
@@ -276,8 +273,7 @@ def _write_generator(project_dir: Path, module_name: str) -> None:
     renderer_class = "".join(word.title() for word in module_name.split("_")) + "Renderer"
 
     content = dedent(f'''\
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
+                # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
         """Dataset generator for {module_name}.
@@ -365,8 +361,7 @@ def _write_generator(project_dir: Path, module_name: str) -> None:
 def _write_models_init(project_dir: Path, module_name: str) -> None:
     """Write models/__init__.py with example Model classes."""
     content = dedent(f'''\
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
+                # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
         """Domain models for {module_name}.
@@ -410,8 +405,7 @@ def _write_models_init(project_dir: Path, module_name: str) -> None:
 def _write_tasks_init(project_dir: Path) -> None:
     """Write tasks/__init__.py."""
     content = dedent('''\
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
+                # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
         """Task definitions for this project."""
@@ -427,8 +421,7 @@ def _write_example_task(project_dir: Path, module_name: str) -> None:
     state_class = "".join(word.title() for word in module_name.split("_")) + "State"
 
     content = dedent(f'''\
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
+                # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
         """Example task - demonstrates 1-image-to-many-samples pattern with distributions.
@@ -722,8 +715,7 @@ def _write_modal_apps(project_dir: Path) -> None:
 def _write_makefile(project_dir: Path, module_name: str) -> None:
     """Write Makefile for code quality and build tasks."""
     content = dedent(f'''\
-        # Copyright (c) 2025 Tylt LLC. All rights reserved.
-        # Derivative works may be released by researchers,
+                # Derivative works may be released by researchers,
         # but original files may not be redistributed or used beyond research purposes.
 
         .PHONY: all check lint typecheck format clean install dev test build generate
